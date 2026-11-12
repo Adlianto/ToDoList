@@ -25,7 +25,7 @@ export type WorkspaceDetail = {
 export type WorkspaceMemberItem = {
     id: number;
     user_id?: number;
-    username: string;
+    account_id?: string;
     name: string;
     role: WorkspaceRole;
     joined_at: string;
@@ -40,15 +40,18 @@ export type WorkspaceTaskItem = {
     description: string | null;
     status: TaskStatus;
     due_at: string | null;
+    lock_version?: number;
     is_overdue: boolean;
     creator: {
         id: number;
-        username: string;
+        account_id?: string;
         name: string;
     };
     can_delete: boolean;
     created_at: string | null;
 };
+
+export type TaskSyncStatus = 'idle' | 'pending' | 'syncing' | 'saved' | 'error';
 
 export type DashboardTaskItem = {
     id: number;
@@ -80,15 +83,15 @@ export type WorkspaceFilters = {
 
 export type WorkspacePendingInvitation = {
     id: number;
-    mode: 'username' | 'code';
+    mode: 'account_id' | 'code';
     invitee: {
         id: number;
-        username: string;
+        account_id: string;
         name: string;
     } | null;
     inviter: {
         id: number;
-        username: string;
+        account_id?: string;
         name: string;
     };
     expires_at: string;
@@ -103,7 +106,7 @@ export type IncomingInvitationItem = {
     };
     inviter: {
         id: number;
-        username: string;
+        account_id?: string;
         name: string;
     };
     expires_at: string;
@@ -112,7 +115,6 @@ export type IncomingInvitationItem = {
 export type User = {
     id: number;
     account_id?: string;
-    username: string;
     name: string;
     email?: string;
     avatar?: string;

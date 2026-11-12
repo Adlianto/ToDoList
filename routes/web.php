@@ -82,12 +82,16 @@ Route::middleware('auth')->group(function (): void {
             ->name('workspaces.invitations.destroy');
 
         Route::post('/workspaces/{workspace}/tasks', [TaskController::class, 'store'])
+            ->middleware('throttle:tasks')
             ->name('workspaces.tasks.store');
         Route::patch('/workspaces/{workspace}/tasks/bulk-update', [TaskController::class, 'bulkUpdate'])
+            ->middleware('throttle:tasks')
             ->name('workspaces.tasks.bulk-update');
         Route::patch('/workspaces/{workspace}/tasks/{task}', [TaskController::class, 'update'])
+            ->middleware('throttle:tasks')
             ->name('workspaces.tasks.update');
         Route::delete('/workspaces/{workspace}/tasks/{task}', [TaskController::class, 'destroy'])
+            ->middleware('throttle:tasks')
             ->name('workspaces.tasks.destroy');
 
         Route::patch('/workspaces/{workspace}/members/{member}', [WorkspaceMemberController::class, 'update'])

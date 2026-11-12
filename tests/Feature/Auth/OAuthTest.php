@@ -37,7 +37,8 @@ describe('Google OAuth Flow', function () {
         $user = User::query()->where('email', 'googleuser@example.com')->firstOrFail();
         expect($user->google_id)->toBe('google-unique-id-12345')
             ->and($user->email_verified_at)->not->toBeNull()
-            ->and($user->username)->toBe('guser');
+            ->and($user->name)->toBe('Google User')
+            ->and($user->account_id)->toMatch('/^[1-9][0-9]{8}$/');
 
         $personalWorkspace = Workspace::query()
             ->where('owner_id', $user->id)

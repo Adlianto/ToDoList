@@ -46,7 +46,7 @@ class DashboardController extends Controller
         $pendingInvitations = $user->receivedInvitations()
             ->with([
                 'workspace:id,name,type',
-                'inviter:id,username,name',
+                'inviter:id,account_id,name',
             ])
             ->where('status', InvitationStatus::Pending)
             ->where('expires_at', '>', now())
@@ -65,7 +65,7 @@ class DashboardController extends Controller
                     ],
                     'inviter' => [
                         'id' => $invitation->inviter->id,
-                        'username' => $invitation->inviter->username,
+                        'account_id' => $invitation->inviter->account_id,
                         'name' => $invitation->inviter->name,
                     ],
                     'expires_at' => $expiresAt->toISOString(),
@@ -73,7 +73,7 @@ class DashboardController extends Controller
             });
 
         $activeTasks = Task::query()
-            ->with(['workspace:id,name,type', 'creator:id,username,name'])
+            ->with(['workspace:id,name,type', 'creator:id,account_id,name'])
             ->whereIn('workspace_id', $workspaceIds)
             ->whereIn('status', [TaskStatus::Todo->value, TaskStatus::InProgress->value])
             ->orderByRaw('CASE WHEN due_at IS NULL THEN 1 ELSE 0 END')

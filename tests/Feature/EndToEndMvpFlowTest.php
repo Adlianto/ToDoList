@@ -13,7 +13,6 @@ describe('End-to-End MVP User Journey', function () {
         // 1. User A (Owner) registers
         $responseA = $this->post(route('register.store'), [
             'name' => 'Alice Admin',
-            'username' => 'alice_lead',
             'email' => 'alice@example.com',
             'password' => 'secret123456',
             'password_confirmation' => 'secret123456',
@@ -44,7 +43,6 @@ describe('End-to-End MVP User Journey', function () {
 
         $this->post(route('register.store'), [
             'name' => 'Bob Builder',
-            'username' => 'bob_dev',
             'email' => 'bob@example.com',
             'password' => 'secret123456',
             'password_confirmation' => 'secret123456',
@@ -52,10 +50,10 @@ describe('End-to-End MVP User Journey', function () {
         $bob = User::query()->where('email', 'bob@example.com')->firstOrFail();
         $this->post(route('logout'));
 
-        // 4. Alice invites Bob via username
+        // 4. Alice invites Bob via Account ID
         $this->actingAs($alice)->post(route('workspaces.invitations.store', $groupWorkspace), [
-            'type' => 'username',
-            'username' => 'bob_dev',
+            'mode' => 'account_id',
+            'account_id' => $bob->account_id,
         ])->assertRedirect(route('workspaces.show', $groupWorkspace));
 
         // 5. Bob logs in, checks invitations, and accepts

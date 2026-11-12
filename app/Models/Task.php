@@ -18,12 +18,13 @@ use Illuminate\Support\Carbon;
  * @property string|null $description
  * @property TaskStatus $status
  * @property Carbon|null $due_at
+ * @property int $lock_version
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Workspace $workspace
  * @property-read User $creator
  */
-#[Fillable(['title', 'description', 'status', 'due_at'])]
+#[Fillable(['title', 'description', 'status', 'due_at', 'lock_version'])]
 class Task extends Model
 {
     /** @use HasFactory<TaskFactory> */
@@ -39,6 +40,7 @@ class Task extends Model
         return [
             'status' => TaskStatus::class,
             'due_at' => 'datetime',
+            'lock_version' => 'integer',
         ];
     }
 

@@ -202,11 +202,11 @@ export function TaskCard({
                 </div>
             </div>
 
-            {/* Footer: Creator Avatar & Username (NO EMAIL) */}
+            {/* Footer: Creator Avatar & Name */}
             <div className="mt-4 flex items-center justify-between border-t border-zinc-100 pt-2.5 dark:border-zinc-800/80">
                 <div
                     className="flex items-center gap-1.5"
-                    title={`Created by ${task.creator.name} (@${task.creator.username})`}
+                    title={`Created by ${task.creator.name}${task.creator.account_id ? ` (ID: ${task.creator.account_id})` : ''}`}
                 >
                     <Avatar className="h-5 w-5">
                         <AvatarFallback className="text-[9px]">
@@ -214,7 +214,7 @@ export function TaskCard({
                         </AvatarFallback>
                     </Avatar>
                     <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
-                        @{task.creator.username}
+                        {task.creator.name}
                     </span>
                 </div>
 

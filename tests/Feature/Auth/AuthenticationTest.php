@@ -27,7 +27,6 @@ describe('Authentication and Personal Workspace Provisioning', function () {
     test('new users can register and receive exactly one personal workspace atomically', function () {
         $response = $this->post(route('register.store'), [
             'name' => 'Budi Santoso',
-            'username' => 'Budi_Santoso-99',
             'email' => 'Budi@Example.com',
             'password' => 'password123',
             'password_confirmation' => 'password123',
@@ -38,7 +37,7 @@ describe('Authentication and Personal Workspace Provisioning', function () {
 
         $user = User::query()->where('email', 'budi@example.com')->firstOrFail();
 
-        expect($user->username)->toBe('budi_santoso-99')
+        expect($user->name)->toBe('Budi Santoso')
             ->and($user->account_id)->toMatch('/^[1-9][0-9]{8}$/')
             ->and(strlen($user->account_id))->toBe(9);
 
@@ -62,27 +61,24 @@ describe('Authentication and Personal Workspace Provisioning', function () {
             ->and($membership?->role)->toBe(WorkspaceRole::Owner);
     });
 
-    test('registration validates unique username, format, and email', function () {
+    test('registration validates unique email and required fields without username', function () {
         User::factory()->create([
-            'username' => 'taken_user',
             'email' => 'taken@example.com',
         ]);
 
         $this->post(route('register.store'), [
             'name' => 'Another User',
-            'username' => 'taken_user',
             'email' => 'taken@example.com',
             'password' => 'password123',
             'password_confirmation' => 'password123',
-        ])->assertSessionHasErrors(['username', 'email']);
+        ])->assertSessionHasErrors(['email']);
 
         $this->post(route('register.store'), [
-            'name' => 'Invalid Username',
-            'username' => 'invalid username with spaces!',
+            'name' => '',
             'email' => 'valid@example.com',
             'password' => 'password123',
             'password_confirmation' => 'password123',
-        ])->assertSessionHasErrors(['username']);
+        ])->assertSessionHasErrors(['name']);
     });
 
     test('ensurePersonalWorkspace is idempotent and database prevents duplicate personal workspaces', function () {
@@ -160,7 +156,7 @@ describe('Authentication and Personal Workspace Provisioning', function () {
         expect($userA->personalWorkspace->id)->not->toBe($userB->personalWorkspace->id);
     });
 
-    test('authenticated user inertia shared auth data provides account_id and omits email', function () {
+    test('authenticated user inertia shared auth data provides account_id and omits email and username', function () {
         $user = User::factory()->withPersonalWorkspace()->create();
 
         expect($user->account_id)->toMatch('/^[1-9][0-9]{8}$/');
@@ -171,8 +167,35 @@ describe('Authentication and Personal Workspace Provisioning', function () {
             ->assertInertia(fn (Assert $page) => $page
                 ->where('auth.user.id', $user->id)
                 ->where('auth.user.account_id', $user->account_id)
-                ->where('auth.user.username', $user->username)
+                ->where('auth.user.name', $user->name)
+                ->missing('auth.user.username')
                 ->missing('auth.user.email')
             );
+    });
+
+    test('createWithUniqueAccountId safely retries when an account_id unique constraint collision occurs', function () {
+        $existingUser = User::factory()->create([
+            'account_id' => '123456789',
+        ]);
+
+        $attemptCount = 0;
+        User::creating(function (User $user) use (&$attemptCount, $existingUser): void {
+            $attemptCount++;
+            if ($attemptCount === 1) {
+                // Force a collision with existingUser on the first insert attempt
+                $user->account_id = $existingUser->account_id;
+            }
+        });
+
+        $newUser = User::createWithUniqueAccountId([
+            'name' => 'Collision Retry User',
+            'email' => 'collision@example.com',
+            'password' => 'password123',
+        ]);
+
+        expect($attemptCount)->toBe(2)
+            ->and($newUser->exists)->toBeTrue()
+            ->and($newUser->account_id)->not->toBe($existingUser->account_id)
+            ->and($newUser->account_id)->toMatch('/^[1-9][0-9]{8}$/');
     });
 });

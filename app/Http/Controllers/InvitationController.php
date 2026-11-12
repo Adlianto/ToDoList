@@ -31,7 +31,7 @@ class InvitationController extends Controller
         $invitations = $user->receivedInvitations()
             ->with([
                 'workspace:id,name,type',
-                'inviter:id,username,name',
+                'inviter:id,account_id,name',
             ])
             ->where('status', InvitationStatus::Pending)
             ->where('expires_at', '>', now())
@@ -50,7 +50,7 @@ class InvitationController extends Controller
                     ],
                     'inviter' => [
                         'id' => $invitation->inviter->id,
-                        'username' => $invitation->inviter->username,
+                        'account_id' => $invitation->inviter->account_id,
                         'name' => $invitation->inviter->name,
                     ],
                     'expires_at' => $expiresAt->toISOString(),

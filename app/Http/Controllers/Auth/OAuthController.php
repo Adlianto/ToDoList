@@ -79,30 +79,13 @@ class OAuthController extends Controller
                 return $existingUser;
             }
 
-            $rawCandidate = (string) ($googleUser->getNickname() ?: Str::before($email, '@'));
-            $sanitized = preg_replace('/[^a-z0-9_-]/', '', Str::lower($rawCandidate));
-            $baseUsername = ! empty($sanitized) ? Str::substr($sanitized, 0, 20) : 'user';
-
-            if (strlen($baseUsername) < 3) {
-                $baseUsername = str_pad($baseUsername, 3, '0');
-            }
-
-            $username = $baseUsername;
-            $counter = 1;
-            while (User::query()->where('username', $username)->exists()) {
-                $suffix = (string) $counter;
-                $username = Str::substr($baseUsername, 0, 30 - strlen($suffix)).$suffix;
-                $counter++;
-            }
-
-            $name = trim((string) ($googleUser->getName() ?: $googleUser->getNickname() ?: $username));
+            $name = trim((string) ($googleUser->getName() ?: $googleUser->getNickname() ?: Str::before($email, '@')));
             if ($name === '') {
-                $name = $username;
+                $name = 'User';
             }
 
-            $newUser = User::query()->create([
+            $newUser = User::createWithUniqueAccountId([
                 'name' => Str::substr($name, 0, 100),
-                'username' => $username,
                 'email' => $email,
                 'google_id' => $googleId,
                 'password' => null,

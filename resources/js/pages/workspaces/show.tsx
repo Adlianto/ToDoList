@@ -56,6 +56,7 @@ export default function WorkspaceShow({
     // Centralized workspace sync queue with instant optimistic UI
     const {
         tasks: localTasks,
+        syncStatus,
         errorMessage,
         setErrorMessage,
         moveTaskStatus,
@@ -139,6 +140,7 @@ export default function WorkspaceShow({
                     membersCount={members.length}
                     activeFilters={activeFilters}
                     permissions={permissions}
+                    syncStatus={syncStatus}
                     onFilterChange={applyFilterUpdate}
                     onOpenCreateDialog={openCreateDialog}
                 />

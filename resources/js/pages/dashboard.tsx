@@ -61,8 +61,7 @@ export default function Dashboard({
                                             {invitation.workspace.name}
                                         </p>
                                         <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                                            Invited by @
-                                            {invitation.inviter.username}
+                                            Invited by {invitation.inviter.name}
                                         </p>
                                     </div>
 

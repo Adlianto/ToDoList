@@ -185,6 +185,13 @@ export function TaskEditDialog({
                 >
                     {({ errors, processing }) => (
                         <>
+                            {task.lock_version !== undefined && (
+                                <input
+                                    type="hidden"
+                                    name="lock_version"
+                                    value={task.lock_version}
+                                />
+                            )}
                             <div>
                                 <label
                                     htmlFor="edit-modal-title"

@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
@@ -21,7 +22,6 @@ use Illuminate\Support\Carbon;
 /**
  * @property int $id
  * @property string $account_id
- * @property string $username
  * @property string $name
  * @property string $email
  * @property string|null $google_id
@@ -37,7 +37,7 @@ use Illuminate\Support\Carbon;
  * @property-read Collection<int, Invitation> $receivedInvitations
  * @property-read Collection<int, Task> $createdTasks
  */
-#[Fillable(['account_id', 'username', 'name', 'email', 'google_id', 'password'])]
+#[Fillable(['account_id', 'name', 'email', 'google_id', 'password'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -66,6 +66,33 @@ class User extends Authenticatable implements MustVerifyEmail
         } while (static::query()->where('account_id', $candidate)->exists());
 
         return $candidate;
+    }
+
+    /**
+     * Create a new user while safely retrying if a concurrent Account ID collision occurs.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    public static function createWithUniqueAccountId(array $attributes, int $maxAttempts = 5): static
+    {
+        $attempt = 0;
+
+        while (true) {
+            $attempt++;
+
+            try {
+                unset($attributes['account_id']);
+
+                /** @var static $user */
+                $user = static::query()->create($attributes);
+
+                return $user;
+            } catch (UniqueConstraintViolationException $e) {
+                if ($attempt >= $maxAttempts || ! str_contains(strtolower($e->getMessage()), 'account_id')) {
+                    throw $e;
+                }
+            }
+        }
     }
 
     /**

@@ -77,9 +77,6 @@ export function AppSidebarContent({
                             <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">
                                 {auth.user.name}
                             </p>
-                            <p className="truncate text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                                @{auth.user.username}
-                            </p>
                             <div className="mt-1 flex items-center gap-1.5">
                                 <span className="inline-block max-w-[140px] truncate rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-[11px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
                                     ID: {auth.user.account_id ?? 'N/A'}

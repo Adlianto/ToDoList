@@ -69,14 +69,6 @@ export default function Welcome() {
                 {/* Hero Section */}
                 <section className="relative overflow-hidden px-4 pt-16 pb-20 sm:px-6 lg:pt-24 lg:pb-28">
                     <div className="mx-auto max-w-4xl text-center">
-                        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3.5 py-1 text-xs font-medium text-zinc-700 shadow-2xs dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
-                            <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
-                            <span>
-                                Production Ready &bull; Personal & Group
-                                Workspaces
-                            </span>
-                        </div>
-
                         <h1 className="text-4xl font-extrabold tracking-tight text-zinc-900 sm:text-5xl lg:text-6xl dark:text-zinc-100">
                             Organize Personal Tasks &amp;
                             <span className="block text-zinc-600 dark:text-zinc-400">
@@ -87,7 +79,7 @@ export default function Welcome() {
                         <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-zinc-600 sm:text-lg dark:text-zinc-400">
                             A focused, distraction-free workspace for your
                             personal to-dos and group projects. Invite team
-                            members securely via username or single-use
+                            members securely via Account ID or single-use
                             invitation codes, track deadlines, and manage
                             workloads with granular role-based permissions.
                         </p>
@@ -308,7 +300,7 @@ export default function Welcome() {
                                     Two-Way Invitations
                                 </h3>
                                 <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-                                    Invite members directly via their @username
+                                    Invite members directly via their Account ID
                                     or issue high-entropy 12-character one-time
                                     codes that expire safely.
                                 </p>

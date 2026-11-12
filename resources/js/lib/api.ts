@@ -28,10 +28,17 @@ export class ApiError extends Error {
     constructor(
         public status: number,
         message: string,
+        public conflicts?: TaskConflictItem[],
     ) {
         super(message);
         this.name = 'ApiError';
     }
+}
+
+export interface TaskConflictItem {
+    task_id: number;
+    status: TaskStatus;
+    lock_version: number;
 }
 
 /**
@@ -41,12 +48,14 @@ export async function patchTaskStatus(
     workspaceId: number,
     taskId: number,
     status: TaskStatus,
+    lockVersion?: number,
 ): Promise<void> {
     const url = updateTask.url({ workspace: workspaceId, task: taskId });
     const csrfToken = getCsrfToken();
 
     const response = await fetch(url, {
         method: 'PATCH',
+        keepalive: true,
         headers: {
             'Content-Type': 'application/json',
             Accept: 'application/json',
@@ -54,7 +63,10 @@ export async function patchTaskStatus(
             ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}),
         },
         credentials: 'same-origin',
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({
+            status,
+            ...(lockVersion !== undefined ? { lock_version: lockVersion } : {}),
+        }),
     });
 
     if (!response.ok) {
@@ -74,12 +86,14 @@ export async function patchTaskStatus(
 export interface TaskBulkUpdateItem {
     task_id: number;
     status: TaskStatus;
+    lock_version?: number;
 }
 
 export interface TaskBulkUpdateResponse {
     message: string;
     updated_count: number;
     updated_task_ids: number[];
+    task_versions?: Record<number, number>;
 }
 
 /**
@@ -94,6 +108,7 @@ export async function patchTaskBulkUpdate(
 
     const response = await fetch(url, {
         method: 'PATCH',
+        keepalive: true,
         headers: {
             'Content-Type': 'application/json',
             Accept: 'application/json',
@@ -106,15 +121,22 @@ export async function patchTaskBulkUpdate(
 
     if (!response.ok) {
         let errorMessage = `Failed to bulk update tasks (HTTP ${response.status})`;
+        let conflicts: TaskConflictItem[] | undefined;
         try {
-            const data = (await response.json()) as { message?: string };
+            const data = (await response.json()) as {
+                message?: string;
+                conflicts?: TaskConflictItem[];
+            };
             if (data?.message) {
                 errorMessage = data.message;
+            }
+            if (Array.isArray(data?.conflicts)) {
+                conflicts = data.conflicts;
             }
         } catch {
             // response was not JSON or empty
         }
-        throw new ApiError(response.status, errorMessage);
+        throw new ApiError(response.status, errorMessage, conflicts);
     }
 
     return (await response.json()) as TaskBulkUpdateResponse;

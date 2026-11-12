@@ -59,8 +59,8 @@ export function WorkspaceMembersSettings({
                                     <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
                                         {member.name}
                                     </p>
-                                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                                        @{member.username}
+                                    <p className="font-mono text-xs text-zinc-500 dark:text-zinc-400">
+                                        ID: {member.account_id ?? 'N/A'}
                                     </p>
                                 </div>
                             </div>
@@ -111,7 +111,7 @@ export function WorkspaceMembersSettings({
                                         onSubmit={(e) => {
                                             if (
                                                 !confirm(
-                                                    `Are you sure you want to remove @${member.username} from this workspace?`,
+                                                    `Are you sure you want to remove ${member.name} from this workspace?`,
                                                 )
                                             ) {
                                                 e.preventDefault();
@@ -144,8 +144,8 @@ export function WorkspaceMembersSettings({
                                 Invite Members
                             </h3>
                             <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                                Invite team members via their @username or
-                                generate a one-time invitation code.
+                                Invite team members via their 9-digit Account ID
+                                or generate a one-time invitation code.
                             </p>
                         </div>
 
@@ -181,19 +181,21 @@ export function WorkspaceMembersSettings({
                                 <input
                                     type="hidden"
                                     name="mode"
-                                    value="username"
+                                    value="account_id"
                                 />
                                 <div className="grow">
                                     <input
-                                        name="username"
+                                        name="account_id"
                                         type="text"
                                         required
-                                        placeholder="Enter username (e.g. budi_santoso)"
+                                        pattern="[1-9][0-9]{8}"
+                                        maxLength={9}
+                                        placeholder="Enter 9-digit Account ID (e.g. 100000001)"
                                         className="w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-2 text-sm text-zinc-900 focus:border-zinc-900 focus:outline-none dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
                                     />
-                                    {errors.username && (
+                                    {errors.account_id && (
                                         <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                                            {errors.username}
+                                            {errors.account_id}
                                         </p>
                                     )}
                                 </div>
@@ -221,12 +223,11 @@ export function WorkspaceMembersSettings({
                                         <div>
                                             <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
                                                 {inv.invitee
-                                                    ? `${inv.invitee.name} (@${inv.invitee.username})`
+                                                    ? `${inv.invitee.name} (ID: ${inv.invitee.account_id})`
                                                     : 'One-Time Invitation Code'}
                                             </p>
                                             <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                                                Created by @
-                                                {inv.inviter.username}
+                                                Created by {inv.inviter.name}
                                             </p>
                                         </div>
 

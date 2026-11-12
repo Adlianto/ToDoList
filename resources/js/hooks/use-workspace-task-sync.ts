@@ -1,10 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
-import { patchTaskBulkUpdate, type TaskBulkUpdateItem } from '@/lib/api';
+import {
+    ApiError,
+    patchTaskBulkUpdate,
+    type TaskBulkUpdateItem,
+} from '@/lib/api';
 import { CARD_MOVE_DEBOUNCE_MS } from '@/lib/constants';
-import { type TaskStatus, type WorkspaceTaskItem } from '@/types';
+import {
+    type TaskStatus,
+    type TaskSyncStatus,
+    type WorkspaceTaskItem,
+} from '@/types';
 
 interface TaskSyncState {
     persistedStatus: TaskStatus;
+    lockVersion: number;
 }
 
 interface UseWorkspaceTaskSyncOptions {
@@ -12,6 +21,75 @@ interface UseWorkspaceTaskSyncOptions {
     initialTasks: WorkspaceTaskItem[];
     debounceMs?: number;
     onError?: (error: Error) => void;
+}
+
+function getStorageKey(workspaceId: number): string {
+    return `workspace_pending_task_sync_${workspaceId}`;
+}
+
+function saveQueueToStorage(
+    workspaceId: number,
+    pending: Map<number, TaskStatus>,
+    inFlight: Map<number, TaskStatus> | null,
+    states: Map<number, TaskSyncState>,
+): void {
+    if (typeof window === 'undefined') {
+        return;
+    }
+
+    try {
+        const merged = new Map<number, TaskStatus>();
+        if (inFlight) {
+            inFlight.forEach((status, id) => merged.set(id, status));
+        }
+        pending.forEach((status, id) => merged.set(id, status));
+
+        if (merged.size === 0) {
+            window.sessionStorage.removeItem(getStorageKey(workspaceId));
+            return;
+        }
+
+        const items: TaskBulkUpdateItem[] = Array.from(merged.entries()).map(
+            ([taskId, status]) => ({
+                task_id: taskId,
+                status,
+                lock_version: states.get(taskId)?.lockVersion ?? 1,
+            }),
+        );
+
+        window.sessionStorage.setItem(
+            getStorageKey(workspaceId),
+            JSON.stringify(items),
+        );
+    } catch {
+        // Ignore storage quota or privacy mode errors
+    }
+}
+
+function loadQueueFromStorage(workspaceId: number): TaskBulkUpdateItem[] {
+    if (typeof window === 'undefined') {
+        return [];
+    }
+
+    try {
+        const raw = window.sessionStorage.getItem(getStorageKey(workspaceId));
+        if (!raw) {
+            return [];
+        }
+        const parsed = JSON.parse(raw) as unknown;
+        if (!Array.isArray(parsed)) {
+            return [];
+        }
+        return parsed.filter(
+            (item): item is TaskBulkUpdateItem =>
+                typeof item === 'object' &&
+                item !== null &&
+                typeof (item as TaskBulkUpdateItem).task_id === 'number' &&
+                typeof (item as TaskBulkUpdateItem).status === 'string',
+        );
+    } catch {
+        return [];
+    }
 }
 
 export function useWorkspaceTaskSync({
@@ -22,16 +100,12 @@ export function useWorkspaceTaskSync({
 }: UseWorkspaceTaskSyncOptions) {
     const [tasks, setTasks] = useState<WorkspaceTaskItem[]>(initialTasks);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-    // Keep tasks in sync if initialTasks prop updates externally (e.g. filter change or create modal)
-    useEffect(() => {
-        setTasks(initialTasks);
-    }, [initialTasks]);
+    const [syncStatus, setSyncStatus] = useState<TaskSyncStatus>('idle');
 
     // Single global debounce timer for the entire workspace
     const globalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Track the latest persisted status for each task (used for safe rollback)
+    // Track the latest persisted status and lock_version for each task
     const taskPersistedStateRef = useRef<Map<number, TaskSyncState>>(new Map());
 
     // 1. Pending changes queued by the user, waiting for idle debounce
@@ -40,19 +114,77 @@ export function useWorkspaceTaskSync({
     // 2. In-flight changes currently being sent to the server
     const inFlightUpdatesRef = useRef<Map<number, TaskStatus> | null>(null);
 
-    // Initialize/update known persisted status from tasks
+    // Keep tasks in sync if initialTasks prop updates externally (e.g. filter change or create modal),
+    // while preserving any unsynced optimistic changes in the local queue.
     useEffect(() => {
-        tasks.forEach((t) => {
-            if (!taskPersistedStateRef.current.has(t.id)) {
+        initialTasks.forEach((t) => {
+            const existing = taskPersistedStateRef.current.get(t.id);
+            const incomingVersion = t.lock_version ?? 1;
+
+            if (
+                !existing ||
+                incomingVersion >= existing.lockVersion ||
+                (!pendingUpdatesRef.current.has(t.id) &&
+                    !inFlightUpdatesRef.current?.has(t.id))
+            ) {
                 taskPersistedStateRef.current.set(t.id, {
                     persistedStatus: t.status,
+                    lockVersion: incomingVersion,
                 });
             }
         });
-    }, [tasks]);
+
+        // Recover any unsent mutations persisted before an unexpected reload
+        const recovered = loadQueueFromStorage(workspaceId);
+        if (recovered.length > 0) {
+            const validIds = new Set(initialTasks.map((t) => t.id));
+            recovered.forEach((item) => {
+                if (!validIds.has(item.task_id)) {
+                    return;
+                }
+                const serverState = taskPersistedStateRef.current.get(
+                    item.task_id,
+                );
+                if (
+                    serverState &&
+                    serverState.persistedStatus !== item.status &&
+                    (item.lock_version === undefined ||
+                        item.lock_version === serverState.lockVersion)
+                ) {
+                    pendingUpdatesRef.current.set(item.task_id, item.status);
+                }
+            });
+        }
+
+        setTasks(
+            initialTasks.map((t) => {
+                const pendingStatus =
+                    pendingUpdatesRef.current.get(t.id) ??
+                    inFlightUpdatesRef.current?.get(t.id);
+                return pendingStatus ? { ...t, status: pendingStatus } : t;
+            }),
+        );
+
+        if (pendingUpdatesRef.current.size > 0 && !inFlightUpdatesRef.current) {
+            setSyncStatus('pending');
+            if (globalTimerRef.current === null) {
+                globalTimerRef.current = setTimeout(() => {
+                    globalTimerRef.current = null;
+                    void processBatchQueue();
+                }, debounceMs);
+            }
+        } else {
+            saveQueueToStorage(
+                workspaceId,
+                pendingUpdatesRef.current,
+                inFlightUpdatesRef.current,
+                taskPersistedStateRef.current,
+            );
+        }
+    }, [initialTasks, workspaceId]);
 
     /**
-     * Flush all pending updates immediately to the server (e.g. on unmount or before unload).
+     * Flush all pending updates immediately to the server (e.g. on unmount, pagehide, or before unload).
      */
     const flushQueue = () => {
         if (globalTimerRef.current !== null) {
@@ -66,57 +198,98 @@ export function useWorkspaceTaskSync({
      * Process batch updates from pending queue to in-flight request.
      */
     const processBatchQueue = async () => {
-        // If a batch request is already in progress, wait for it to complete.
-        // When it completes, it will automatically trigger another cycle if pendingUpdates is non-empty.
         if (inFlightUpdatesRef.current !== null) {
             return;
         }
 
-        // If no pending updates, nothing to do
         if (pendingUpdatesRef.current.size === 0) {
             return;
         }
 
-        // Snapshot pending updates into in-flight collection and clear pending
         const currentBatch = new Map(pendingUpdatesRef.current);
         pendingUpdatesRef.current.clear();
         inFlightUpdatesRef.current = currentBatch;
+        setSyncStatus('syncing');
+
+        saveQueueToStorage(
+            workspaceId,
+            pendingUpdatesRef.current,
+            inFlightUpdatesRef.current,
+            taskPersistedStateRef.current,
+        );
 
         const payload: TaskBulkUpdateItem[] = Array.from(
             currentBatch.entries(),
         ).map(([taskId, status]) => ({
             task_id: taskId,
             status,
+            lock_version:
+                taskPersistedStateRef.current.get(taskId)?.lockVersion ?? 1,
         }));
 
         try {
-            await patchTaskBulkUpdate(workspaceId, payload);
+            const response = await patchTaskBulkUpdate(workspaceId, payload);
 
-            // Successfully persisted this batch
+            // Successfully persisted this batch: update known persisted status and lock_version
             currentBatch.forEach((status, taskId) => {
-                const state = taskPersistedStateRef.current.get(taskId);
-                if (state) {
-                    state.persistedStatus = status;
-                } else {
-                    taskPersistedStateRef.current.set(taskId, {
-                        persistedStatus: status,
-                    });
-                }
+                const currentVersion =
+                    taskPersistedStateRef.current.get(taskId)?.lockVersion ?? 1;
+                const nextVersion =
+                    response.task_versions?.[taskId] ?? currentVersion + 1;
+
+                taskPersistedStateRef.current.set(taskId, {
+                    persistedStatus: status,
+                    lockVersion: nextVersion,
+                });
             });
 
-            // Mark in-flight as done
-            inFlightUpdatesRef.current = null;
+            setTasks((prev) =>
+                prev.map((t) => {
+                    const updatedState = taskPersistedStateRef.current.get(
+                        t.id,
+                    );
+                    if (currentBatch.has(t.id) && updatedState) {
+                        return {
+                            ...t,
+                            lock_version: updatedState.lockVersion,
+                        };
+                    }
+                    return t;
+                }),
+            );
 
-            // If new pending changes arrived while this batch was in-flight,
-            // process them immediately if no active debounce timer is running
-            if (
-                pendingUpdatesRef.current.size > 0 &&
-                globalTimerRef.current === null
-            ) {
-                void processBatchQueue();
+            inFlightUpdatesRef.current = null;
+            saveQueueToStorage(
+                workspaceId,
+                pendingUpdatesRef.current,
+                inFlightUpdatesRef.current,
+                taskPersistedStateRef.current,
+            );
+
+            if (pendingUpdatesRef.current.size > 0) {
+                setSyncStatus('pending');
+                if (globalTimerRef.current === null) {
+                    void processBatchQueue();
+                }
+            } else {
+                setSyncStatus('saved');
             }
         } catch (error) {
-            // Batch failed: rollback tasks in this batch ONLY if no newer pending update was queued for that task
+            // If server detected an optimistic concurrency conflict (HTTP 409), adopt authoritative server versions
+            if (
+                error instanceof ApiError &&
+                error.status === 409 &&
+                error.conflicts
+            ) {
+                error.conflicts.forEach((conflict) => {
+                    taskPersistedStateRef.current.set(conflict.task_id, {
+                        persistedStatus: conflict.status,
+                        lockVersion: conflict.lock_version,
+                    });
+                });
+            }
+
+            // Rollback tasks in this batch ONLY if no newer pending update was queued for that task
             setTasks((prev) =>
                 prev.map((t) => {
                     if (
@@ -125,30 +298,33 @@ export function useWorkspaceTaskSync({
                     ) {
                         const state = taskPersistedStateRef.current.get(t.id);
                         return state
-                            ? { ...t, status: state.persistedStatus }
+                            ? {
+                                  ...t,
+                                  status: state.persistedStatus,
+                                  lock_version: state.lockVersion,
+                              }
                             : t;
                     }
                     return t;
                 }),
             );
 
-            // Re-queue any updates that user did NOT modify again, or discard if user modified
-            currentBatch.forEach((status, taskId) => {
-                if (!pendingUpdatesRef.current.has(taskId)) {
-                    // Reverted locally, remove from queue
-                }
-            });
-
             inFlightUpdatesRef.current = null;
+            saveQueueToStorage(
+                workspaceId,
+                pendingUpdatesRef.current,
+                inFlightUpdatesRef.current,
+                taskPersistedStateRef.current,
+            );
 
             const err =
                 error instanceof Error
                     ? error
                     : new Error('Failed to synchronize workspace tasks');
             setErrorMessage(err.message);
+            setSyncStatus('error');
             onError?.(err);
 
-            // If new changes were queued during the failed request, attempt to sync them
             if (
                 pendingUpdatesRef.current.size > 0 &&
                 globalTimerRef.current === null
@@ -185,11 +361,17 @@ export function useWorkspaceTaskSync({
             (!inFlightUpdatesRef.current ||
                 !inFlightUpdatesRef.current.has(taskId))
         ) {
-            // Card was moved back to its persisted status before sending: remove from pending
             pendingUpdatesRef.current.delete(taskId);
         } else {
             pendingUpdatesRef.current.set(taskId, destinationStatus);
         }
+
+        saveQueueToStorage(
+            workspaceId,
+            pendingUpdatesRef.current,
+            inFlightUpdatesRef.current,
+            taskPersistedStateRef.current,
+        );
 
         // 3. Reset Global Workspace Debounce Timer
         if (globalTimerRef.current !== null) {
@@ -197,28 +379,48 @@ export function useWorkspaceTaskSync({
             globalTimerRef.current = null;
         }
 
-        // Only start timer if there are pending updates to send
         if (pendingUpdatesRef.current.size > 0) {
+            setSyncStatus(
+                inFlightUpdatesRef.current !== null ? 'syncing' : 'pending',
+            );
             globalTimerRef.current = setTimeout(() => {
                 globalTimerRef.current = null;
                 void processBatchQueue();
             }, debounceMs);
+        } else if (inFlightUpdatesRef.current === null) {
+            setSyncStatus('idle');
         }
     };
 
-    // Component lifecycle cleanup: flush or cancel pending timers
+    // Component lifecycle cleanup: flush pending updates on pagehide / visibilitychange / beforeunload
     useEffect(() => {
-        const handleBeforeUnload = () => {
+        const handleFlush = () => {
             flushQueue();
         };
 
-        window.addEventListener('beforeunload', handleBeforeUnload);
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'hidden') {
+                flushQueue();
+            }
+        };
+
+        window.addEventListener('beforeunload', handleFlush);
+        window.addEventListener('pagehide', handleFlush);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
 
         return () => {
-            window.removeEventListener('beforeunload', handleBeforeUnload);
+            window.removeEventListener('beforeunload', handleFlush);
+            window.removeEventListener('pagehide', handleFlush);
+            document.removeEventListener(
+                'visibilitychange',
+                handleVisibilityChange,
+            );
             if (globalTimerRef.current !== null) {
                 clearTimeout(globalTimerRef.current);
                 globalTimerRef.current = null;
+            }
+            if (pendingUpdatesRef.current.size > 0) {
+                void processBatchQueue();
             }
         };
     }, [workspaceId]);
@@ -226,6 +428,7 @@ export function useWorkspaceTaskSync({
     return {
         tasks,
         setTasks,
+        syncStatus,
         errorMessage,
         setErrorMessage,
         moveTaskStatus,

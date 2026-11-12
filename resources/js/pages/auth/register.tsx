@@ -87,34 +87,6 @@ export default function Register() {
 
                                 <div>
                                     <label
-                                        htmlFor="username"
-                                        className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300"
-                                    >
-                                        Username
-                                    </label>
-                                    <input
-                                        id="username"
-                                        name="username"
-                                        type="text"
-                                        required
-                                        pattern="^[a-zA-Z0-9_-]+$"
-                                        autoComplete="username"
-                                        placeholder="e.g. alex_dev"
-                                        className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-900 focus:outline-none dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-400"
-                                    />
-                                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                                        Lowercase letters, numbers, dashes, and
-                                        underscores only.
-                                    </p>
-                                    {errors.username && (
-                                        <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                                            {errors.username}
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <label
                                         htmlFor="email"
                                         className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300"
                                     >

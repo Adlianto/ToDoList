@@ -14,7 +14,7 @@ describe('Invitation Flow and Atomic Acceptance', function () {
         $admin = User::factory()->withPersonalWorkspace()->create();
         $member = User::factory()->withPersonalWorkspace()->create();
         $stranger = User::factory()->withPersonalWorkspace()->create();
-        $invitee = User::factory()->withPersonalWorkspace()->create(['username' => 'target_user']);
+        $invitee = User::factory()->withPersonalWorkspace()->create();
 
         $group = Workspace::factory()->withOwnerMembership()->create([
             'owner_id' => $owner->id,
@@ -37,32 +37,32 @@ describe('Invitation Flow and Atomic Acceptance', function () {
         // Personal workspace cannot invite anyone
         $this->actingAs($owner)
             ->post(route('workspaces.invitations.store', $owner->personalWorkspace), [
-                'mode' => 'username',
-                'username' => 'target_user',
+                'mode' => 'account_id',
+                'account_id' => $invitee->account_id,
             ])
             ->assertForbidden();
 
         // Regular member cannot invite
         $this->actingAs($member)
             ->post(route('workspaces.invitations.store', $group), [
-                'mode' => 'username',
-                'username' => 'target_user',
+                'mode' => 'account_id',
+                'account_id' => $invitee->account_id,
             ])
             ->assertForbidden();
 
         // Non-member cannot invite
         $this->actingAs($stranger)
             ->post(route('workspaces.invitations.store', $group), [
-                'mode' => 'username',
-                'username' => 'target_user',
+                'mode' => 'account_id',
+                'account_id' => $invitee->account_id,
             ])
             ->assertForbidden();
 
-        // Admin can invite by username
+        // Admin can invite by Account ID
         $this->actingAs($admin)
             ->post(route('workspaces.invitations.store', $group), [
-                'mode' => 'username',
-                'username' => '@TARGET_USER',
+                'mode' => 'account_id',
+                'account_id' => $invitee->account_id,
             ])
             ->assertRedirect(route('workspaces.show', $group));
 
@@ -78,8 +78,8 @@ describe('Invitation Flow and Atomic Acceptance', function () {
 
     test('cannot invite an existing member or create duplicate active pending invitations', function () {
         $owner = User::factory()->withPersonalWorkspace()->create();
-        $existingMember = User::factory()->withPersonalWorkspace()->create(['username' => 'existing_member']);
-        $invitee = User::factory()->withPersonalWorkspace()->create(['username' => 'pending_user']);
+        $existingMember = User::factory()->withPersonalWorkspace()->create();
+        $invitee = User::factory()->withPersonalWorkspace()->create();
 
         $group = Workspace::factory()->withOwnerMembership()->create([
             'owner_id' => $owner->id,
@@ -95,29 +95,62 @@ describe('Invitation Flow and Atomic Acceptance', function () {
         // Cannot invite existing member
         $this->actingAs($owner)
             ->post(route('workspaces.invitations.store', $group), [
-                'mode' => 'username',
-                'username' => 'existing_member',
+                'mode' => 'account_id',
+                'account_id' => $existingMember->account_id,
             ])
-            ->assertSessionHasErrors('username');
+            ->assertSessionHasErrors('account_id');
 
         // First invitation succeeds
         $this->actingAs($owner)
             ->post(route('workspaces.invitations.store', $group), [
-                'mode' => 'username',
-                'username' => 'pending_user',
+                'mode' => 'account_id',
+                'account_id' => $invitee->account_id,
             ])
             ->assertSessionHasNoErrors();
 
         // Duplicate active pending invitation is rejected
         $this->actingAs($owner)
             ->post(route('workspaces.invitations.store', $group), [
-                'mode' => 'username',
-                'username' => 'pending_user',
+                'mode' => 'account_id',
+                'account_id' => $invitee->account_id,
             ])
-            ->assertSessionHasErrors('username');
+            ->assertSessionHasErrors('account_id');
 
         expect(Invitation::query()->where('workspace_id', $group->id)->where('invitee_id', $invitee->id)->count())
             ->toBe(1);
+    });
+
+    test('users with identical names but different account_ids are distinguished accurately during invitation', function () {
+        $owner = User::factory()->withPersonalWorkspace()->create();
+        $userOne = User::factory()->withPersonalWorkspace()->create(['name' => 'Siti Nurhaliza']);
+        $userTwo = User::factory()->withPersonalWorkspace()->create(['name' => 'Siti Nurhaliza']);
+
+        $group = Workspace::factory()->withOwnerMembership()->create([
+            'owner_id' => $owner->id,
+        ]);
+
+        expect($userOne->name)->toBe($userTwo->name)
+            ->and($userOne->account_id)->not->toBe($userTwo->account_id);
+
+        // Invite userTwo specifically via their Account ID
+        $this->actingAs($owner)
+            ->post(route('workspaces.invitations.store', $group), [
+                'mode' => 'account_id',
+                'account_id' => $userTwo->account_id,
+            ])
+            ->assertRedirect(route('workspaces.show', $group));
+
+        $invitation = Invitation::query()
+            ->where('workspace_id', $group->id)
+            ->where('invitee_id', $userTwo->id)
+            ->first();
+
+        expect($invitation)->not->toBeNull()
+            ->and($invitation?->invitee_id)->toBe($userTwo->id);
+
+        // userOne has no invitation
+        expect(Invitation::query()->where('workspace_id', $group->id)->where('invitee_id', $userOne->id)->exists())
+            ->toBeFalse();
     });
 
     test('invitee can view pending invitations and accept or decline them atomically', function () {

@@ -26,7 +26,6 @@ class UserFactory extends Factory
     {
         return [
             'account_id' => User::generateUniqueAccountId(),
-            'username' => Str::lower(fake()->unique()->lexify('user_????????')),
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),

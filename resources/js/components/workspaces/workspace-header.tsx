@@ -1,9 +1,13 @@
 import { Form } from '@inertiajs/react';
 import {
+    AlertCircle,
     CalendarDays,
+    CheckCircle2,
+    Clock,
     Filter,
     FolderKanban,
     ListTodo,
+    Loader2,
     Plus,
     Users,
 } from 'lucide-react';
@@ -12,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     type TaskStatus,
+    type TaskSyncStatus,
     type WorkspaceDetail,
     type WorkspaceFilters,
     type WorkspacePermissions,
@@ -22,6 +27,7 @@ type WorkspaceHeaderProps = {
     membersCount: number;
     activeFilters: WorkspaceFilters;
     permissions: WorkspacePermissions;
+    syncStatus?: TaskSyncStatus;
     onFilterChange: (updates: Partial<WorkspaceFilters>) => void;
     onOpenCreateDialog: (status?: TaskStatus) => void;
 };
@@ -48,6 +54,7 @@ export function WorkspaceHeader({
     membersCount,
     activeFilters,
     permissions,
+    syncStatus = 'idle',
     onFilterChange,
     onOpenCreateDialog,
 }: WorkspaceHeaderProps) {
@@ -72,6 +79,42 @@ export function WorkspaceHeader({
                             >
                                 Role: {workspace.current_user_role}
                             </Badge>
+                        )}
+                        {syncStatus === 'pending' && (
+                            <span
+                                data-testid="sync-status-pending"
+                                className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950/60 dark:text-amber-300"
+                            >
+                                <Clock className="h-3 w-3" />
+                                <span>Unsaved changes...</span>
+                            </span>
+                        )}
+                        {syncStatus === 'syncing' && (
+                            <span
+                                data-testid="sync-status-syncing"
+                                className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-950/60 dark:text-blue-300"
+                            >
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                <span>Saving...</span>
+                            </span>
+                        )}
+                        {syncStatus === 'saved' && (
+                            <span
+                                data-testid="sync-status-saved"
+                                className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+                            >
+                                <CheckCircle2 className="h-3 w-3" />
+                                <span>Saved</span>
+                            </span>
+                        )}
+                        {syncStatus === 'error' && (
+                            <span
+                                data-testid="sync-status-error"
+                                className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-medium text-rose-700 dark:bg-rose-950/60 dark:text-rose-300"
+                            >
+                                <AlertCircle className="h-3 w-3" />
+                                <span>Sync failed</span>
+                            </span>
                         )}
                     </div>
                     <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">

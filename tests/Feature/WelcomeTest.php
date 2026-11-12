@@ -16,7 +16,6 @@ describe('Welcome Landing Page', function () {
     test('authenticated user can view landing page with auth state', function () {
         $user = User::factory()->withPersonalWorkspace()->create([
             'name' => 'Budi Pratama',
-            'username' => 'budipratama',
         ]);
 
         $this->actingAs($user)
@@ -25,7 +24,9 @@ describe('Welcome Landing Page', function () {
             ->assertInertia(fn (Assert $page) => $page
                 ->component('welcome')
                 ->where('auth.user.id', $user->id)
-                ->where('auth.user.username', 'budipratama')
+                ->where('auth.user.account_id', $user->account_id)
+                ->where('auth.user.name', 'Budi Pratama')
+                ->missing('auth.user.username')
             );
     });
 });

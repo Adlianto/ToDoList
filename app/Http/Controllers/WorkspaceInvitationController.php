@@ -15,7 +15,7 @@ use Illuminate\Validation\ValidationException;
 class WorkspaceInvitationController extends Controller
 {
     /**
-     * Create a new invitation in the specified group workspace (by username or claimable code).
+     * Create a new invitation in the specified group workspace (by account_id or claimable code).
      *
      * @throws ValidationException
      */
@@ -26,7 +26,7 @@ class WorkspaceInvitationController extends Controller
         /** @var User $inviter */
         $inviter = $request->user();
 
-        /** @var array{mode: string, username?: string|null} $validated */
+        /** @var array{mode: string, account_id?: string|null} $validated */
         $validated = $request->validated();
 
         if ($validated['mode'] === 'code') {
@@ -49,18 +49,18 @@ class WorkspaceInvitationController extends Controller
                 ->with('invitation_code', $plainCode);
         }
 
-        $targetUsername = (string) ($validated['username'] ?? '');
-        $invitee = User::query()->where('username', $targetUsername)->first();
+        $targetAccountId = (string) ($validated['account_id'] ?? '');
+        $invitee = User::query()->where('account_id', $targetAccountId)->first();
 
         if (! $invitee instanceof User) {
             throw ValidationException::withMessages([
-                'username' => 'No account was found with that username.',
+                'account_id' => 'No account was found with that Account ID.',
             ]);
         }
 
         if ($workspace->hasMember($invitee)) {
             throw ValidationException::withMessages([
-                'username' => 'This user is already a member of the workspace.',
+                'account_id' => 'This user is already a member of the workspace.',
             ]);
         }
 
@@ -72,7 +72,7 @@ class WorkspaceInvitationController extends Controller
 
         if ($hasActivePending) {
             throw ValidationException::withMessages([
-                'username' => 'This user already has an active pending invitation for this workspace.',
+                'account_id' => 'This user already has an active pending invitation for this workspace.',
             ]);
         }
 
@@ -89,7 +89,7 @@ class WorkspaceInvitationController extends Controller
 
         return redirect()
             ->route('workspaces.show', $workspace)
-            ->with('success', sprintf('Invitation sent to @%s.', $invitee->username));
+            ->with('success', sprintf('Invitation sent to %s (ID: %s).', $invitee->name, $invitee->account_id));
     }
 
     /**

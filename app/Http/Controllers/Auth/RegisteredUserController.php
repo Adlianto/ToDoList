@@ -27,13 +27,12 @@ class RegisteredUserController extends Controller
      */
     public function store(RegisterRequest $request): RedirectResponse
     {
-        /** @var array{name: string, username: string, email: string, password: string} $validated */
+        /** @var array{name: string, email: string, password: string} $validated */
         $validated = $request->validated();
 
         $user = DB::transaction(function () use ($validated): User {
-            $user = User::query()->create([
+            $user = User::createWithUniqueAccountId([
                 'name' => $validated['name'],
-                'username' => $validated['username'],
                 'email' => $validated['email'],
                 'password' => $validated['password'],
             ]);

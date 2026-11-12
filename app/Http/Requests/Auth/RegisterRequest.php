@@ -24,9 +24,9 @@ class RegisterRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
-        if ($this->has('username') && is_string($this->input('username'))) {
+        if ($this->has('name') && is_string($this->input('name'))) {
             $this->merge([
-                'username' => Str::lower(trim($this->input('username'))),
+                'name' => trim($this->input('name')),
             ]);
         }
 
@@ -46,14 +46,6 @@ class RegisterRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:100'],
-            'username' => [
-                'required',
-                'string',
-                'min:3',
-                'max:30',
-                'regex:/^[a-z0-9_-]+$/',
-                Rule::unique(User::class, 'username'),
-            ],
             'email' => [
                 'required',
                 'string',
@@ -72,8 +64,6 @@ class RegisterRequest extends FormRequest
      */
     public function messages(): array
     {
-        return [
-            'username.regex' => 'Username may only contain lowercase letters, numbers, dashes, and underscores.',
-        ];
+        return [];
     }
 }

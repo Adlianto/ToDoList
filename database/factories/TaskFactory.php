@@ -29,6 +29,7 @@ class TaskFactory extends Factory
             'description' => fake()->optional()->paragraph(),
             'status' => TaskStatus::Todo,
             'due_at' => fake()->optional()->dateTimeBetween('now', '+14 days'),
+            'lock_version' => 1,
         ];
     }
 }

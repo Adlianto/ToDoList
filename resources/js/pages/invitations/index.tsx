@@ -91,9 +91,7 @@ export default function InvitationsIndex({
                                             {invitation.workspace.name}
                                         </p>
                                         <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-                                            Invited by {invitation.inviter.name}{' '}
-                                            (@
-                                            {invitation.inviter.username})
+                                            Invited by {invitation.inviter.name}
                                         </p>
                                     </div>
 

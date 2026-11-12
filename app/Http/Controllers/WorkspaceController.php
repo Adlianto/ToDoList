@@ -137,7 +137,7 @@ class WorkspaceController extends Controller
             : 'kanban';
 
         $tasksQuery = $workspace->tasks()
-            ->with('creator:id,username,name');
+            ->with('creator:id,account_id,name');
 
         if ($activeStatus !== 'all') {
             $tasksQuery->where('status', $activeStatus);
@@ -191,12 +191,13 @@ class WorkspaceController extends Controller
                     'description' => $task->description,
                     'status' => $task->status->value,
                     'due_at' => $dueAt?->toISOString(),
+                    'lock_version' => $task->lock_version,
                     'is_overdue' => $dueAt !== null
                         && $task->status !== TaskStatus::Done
                         && $dueAt->isPast(),
                     'creator' => [
                         'id' => $task->creator->id,
-                        'username' => $task->creator->username,
+                        'account_id' => $task->creator->account_id,
                         'name' => $task->creator->name,
                     ],
                     'can_delete' => $canDeleteAnyTask || $task->created_by === $user->id,
@@ -205,7 +206,7 @@ class WorkspaceController extends Controller
             });
 
         $members = $workspace->memberships()
-            ->with('user:id,username,name')
+            ->with('user:id,account_id,name')
             ->orderByRaw("CASE WHEN role = 'owner' THEN 0 WHEN role = 'admin' THEN 1 ELSE 2 END")
             ->orderBy('joined_at')
             ->get()
@@ -216,7 +217,7 @@ class WorkspaceController extends Controller
                 return [
                     'id' => $membership->id,
                     'user_id' => $membership->user->id,
-                    'username' => $membership->user->username,
+                    'account_id' => $membership->user->account_id,
                     'name' => $membership->user->name,
                     'role' => $membership->role->value,
                     'joined_at' => $joinedAt->toISOString(),
@@ -227,7 +228,7 @@ class WorkspaceController extends Controller
 
         $pendingInvitations = $canInvite
             ? $workspace->invitations()
-                ->with(['invitee:id,username,name', 'inviter:id,username,name'])
+                ->with(['invitee:id,account_id,name', 'inviter:id,account_id,name'])
                 ->where('status', InvitationStatus::Pending)
                 ->where('expires_at', '>', now())
                 ->orderByDesc('created_at')
@@ -238,15 +239,15 @@ class WorkspaceController extends Controller
 
                     return [
                         'id' => $invitation->id,
-                        'mode' => $invitation->invitee_id !== null ? 'username' : 'code',
+                        'mode' => $invitation->invitee_id !== null ? 'account_id' : 'code',
                         'invitee' => $invitation->invitee ? [
                             'id' => $invitation->invitee->id,
-                            'username' => $invitation->invitee->username,
+                            'account_id' => $invitation->invitee->account_id,
                             'name' => $invitation->invitee->name,
                         ] : null,
                         'inviter' => [
                             'id' => $invitation->inviter->id,
-                            'username' => $invitation->inviter->username,
+                            'account_id' => $invitation->inviter->account_id,
                             'name' => $invitation->inviter->name,
                         ],
                         'expires_at' => $expiresAt->toISOString(),

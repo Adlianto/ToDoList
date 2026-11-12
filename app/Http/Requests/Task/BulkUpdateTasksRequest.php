@@ -28,6 +28,7 @@ class BulkUpdateTasksRequest extends FormRequest
             'updates' => ['required', 'array', 'min:1', 'max:100'],
             'updates.*.task_id' => ['required', 'integer', 'min:1'],
             'updates.*.status' => ['required', 'string', Rule::enum(TaskStatus::class)],
+            'updates.*.lock_version' => ['sometimes', 'integer', 'min:1'],
         ];
     }
 }

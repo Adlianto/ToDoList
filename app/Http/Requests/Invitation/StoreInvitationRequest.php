@@ -4,7 +4,6 @@ namespace App\Http\Requests\Invitation;
 
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class StoreInvitationRequest extends FormRequest
@@ -24,15 +23,15 @@ class StoreInvitationRequest extends FormRequest
     {
         if (! $this->has('mode')) {
             $this->merge([
-                'mode' => 'username',
+                'mode' => 'account_id',
             ]);
         }
 
-        if ($this->has('username') && is_string($this->input('username'))) {
-            $cleanUsername = ltrim(trim($this->input('username')), '@');
+        if ($this->has('account_id') && (is_string($this->input('account_id')) || is_numeric($this->input('account_id')))) {
+            $cleanAccountId = trim((string) $this->input('account_id'));
 
             $this->merge([
-                'username' => Str::lower($cleanUsername),
+                'account_id' => $cleanAccountId,
             ]);
         }
     }
@@ -45,15 +44,13 @@ class StoreInvitationRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'mode' => ['required', 'string', Rule::in(['username', 'code'])],
-            'username' => [
+            'mode' => ['required', 'string', Rule::in(['account_id', 'code'])],
+            'account_id' => [
                 'nullable',
-                'required_if:mode,username',
+                'required_if:mode,account_id',
                 'string',
-                'min:3',
-                'max:30',
-                'regex:/^[a-z0-9_-]+$/',
-                Rule::exists('users', 'username'),
+                'regex:/^[1-9][0-9]{8}$/',
+                Rule::exists('users', 'account_id'),
             ],
         ];
     }
@@ -66,7 +63,9 @@ class StoreInvitationRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'username.exists' => 'No account was found with that username.',
+            'account_id.required_if' => 'Account ID is required to send an invitation.',
+            'account_id.regex' => 'Account ID must be a 9-digit numeric identifier.',
+            'account_id.exists' => 'No account was found with that Account ID.',
         ];
     }
 }
